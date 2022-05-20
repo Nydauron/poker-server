@@ -19,6 +19,7 @@ pub struct CardDeck {
 }
 
 impl CardDeck {
+    // TODO: Add a way of creating different forms of short decks (e.g. A-7, 6-A)
     pub fn new() -> Result<CardDeck, Error> {
         let mut buf = [0u8; 8];
         let res = getrandom::getrandom(&mut buf);
