@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::poker::games::GameVariation;
 use crate::poker::games::evaluator_results::EvaluatorResults;
 use crate::poker::CardDeck;
-use super::super::player::Player;
+use crate::poker::Player;
 
 use rs_poker::core::Rank;
 
@@ -13,6 +13,9 @@ pub struct FiveCardDraw {
 }
 
 impl FiveCardDraw {
+    const MIN_PLAYER_COUNT: usize = 2;
+    const MAX_PLAYER_COUNT: usize = 6;
+
     pub fn new() -> FiveCardDraw {
         FiveCardDraw {
             deck: CardDeck::new().unwrap(),
@@ -21,7 +24,7 @@ impl FiveCardDraw {
     }
 
     fn check_player_condition(& self, players:& HashMap<u32, Player>) -> bool {
-        players.len() >= 2 && players.len() <= 6
+        players.len() >= FiveCardDraw::MIN_PLAYER_COUNT && players.len() <= FiveCardDraw::MAX_PLAYER_COUNT
     }
 }
 
