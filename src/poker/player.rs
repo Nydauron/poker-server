@@ -4,13 +4,15 @@ use rs_poker::core::Card;
 
 pub struct Player {
     table_position: u32,
-    name: String,
-    stack: u64,
+    pub name: String,
+    pub stack: u64,
+    pub bet: u64,
+    pub is_in_hand: bool,
     hand: Vec<Card>,
 
     // player config stuff
-    is_in_hand: bool,
-    play_in_bomb_pots: bool,
+    pub is_away: bool,
+    pub play_in_bomb_pots: bool,
 }
 
 impl Player {
@@ -19,9 +21,11 @@ impl Player {
             table_position: position,
             name: name,
             stack: starting_stack,
+            bet: 0,
+            is_in_hand: true,
             hand: Vec::new(),
 
-            is_in_hand: true,
+            is_away: false,
             play_in_bomb_pots: true,
         }
     }

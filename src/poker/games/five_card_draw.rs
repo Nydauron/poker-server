@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::poker::games::GameVariation;
 use crate::poker::games::evaluator_results::EvaluatorResults;
 use crate::poker::CardDeck;
@@ -18,20 +20,20 @@ impl FiveCardDraw {
         }
     }
 
-    fn check_player_condition(& self, players:& Vec<Player>) -> bool {
+    fn check_player_condition(& self, players:& HashMap<u32, Player>) -> bool {
         players.len() >= 2 && players.len() <= 6
     }
 }
 
 impl GameVariation for FiveCardDraw {
-    fn start_normal(&mut self, players:&mut Vec<Player>, btn_idx: usize) -> Result<(), &str> {
+    fn start_normal(&mut self, players:&mut HashMap<u32, Player>, btn_idx: usize) -> Result<(), &str> {
         if self.check_player_condition(players) {
             return Err("Does not meet player requirements");
         }
 
         players.iter().for_each(|x| {
             let (cards, muck_reshuffled) = self.deck.deal_cards(5);
-            x.set_new_hand(cards.unwrap());
+            x.1.set_new_hand(cards.unwrap());
         });
 
         Ok(())

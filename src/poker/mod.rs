@@ -1,8 +1,14 @@
 pub mod pokerdeck;
-pub mod games;
-pub mod player;
-pub mod table;
 pub use self::pokerdeck::*;
+
+pub mod games;
 pub use self::games::*;
+
+pub mod player;
 pub use self::player::*;
+
+pub mod table;
 pub use self::table::*;
+
+pub mod pot;
+pub use self::pot::*;
