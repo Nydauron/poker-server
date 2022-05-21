@@ -34,7 +34,7 @@ impl GameVariation for FiveCardDraw {
             return Err("Does not meet player requirements");
         }
 
-        players.iter().for_each(|x| {
+        players.iter_mut().for_each(|x| {
             let (cards, muck_reshuffled) = self.deck.deal_cards(5);
             x.1.set_new_hand(cards.unwrap());
         });
@@ -45,6 +45,7 @@ impl GameVariation for FiveCardDraw {
     fn evaluate_all_hands(& self) -> Vec<Vec<(&Player, Rank)>> {
         // calls evaluator
         // TODO: Implement
+        Vec::new()
     }
 
 }
@@ -56,5 +57,6 @@ pub struct FiveCardDrawEvaluator {
 impl EvaluatorResults for FiveCardDrawEvaluator {
     fn get_list_of_rankings(& self) -> Vec<Vec<(&Player, Rank)>> {
         // TODO: Implement with either rs_poker or yr own
+        Vec::new()
     }
 }
