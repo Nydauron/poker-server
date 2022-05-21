@@ -4,9 +4,9 @@ use crate::poker::Player;
 use crate::poker::GameVariation;
 use crate::poker::games::DefaultGame;
 
-use crate::poker::Pot;
+use crate::poker::{Pot, NoLimitPot};
 
-pub struct Table<'a> {
+pub struct Table {
     players: HashMap<u32, Player>,  // list of all players corresponding to their table position
     game: Box<dyn GameVariation>,   // what game the table is playing
     
@@ -14,22 +14,22 @@ pub struct Table<'a> {
 
     big_blind_idx: usize,
     btn_idx: usize,
-    pot: Pot<'a>,                   // handles all bets from players, checks for when all bets are good, and distributes pot based upon rankings
+    pot: Box<dyn Pot>,              // handles all bets from players, checks for when all bets are good, and distributes pot based upon rankings
 
     is_running: bool,               // is the table running (start/stop next hand)
     is_paused: bool,                // is the current hand paused
 }
 
-impl<'a> Table<'a> {
+impl Table {
 
-    pub fn new() -> Table<'a> {
+    pub fn new() -> Table {
         Table {
             players: HashMap::new(),
             game: Box::new(DefaultGame::new()),
             action_idx: 0,
             big_blind_idx: 0,
             btn_idx: 0,
-            pot: Pot::new(),
+            pot: Box::new(NoLimitPot::new()),
             is_running: false,
             is_paused: false,
         }

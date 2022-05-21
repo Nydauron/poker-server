@@ -1,6 +1,6 @@
 use crate::poker::Player;
 
-pub struct Pot<'a> {
+pub struct NoLimitPot<'a> {
     pots: Vec<u64>,
     elegible_players: Vec<Vec<&'a Player>>,
 
@@ -10,9 +10,9 @@ pub struct Pot<'a> {
     bet_diff: u64,          // used to determine the minimum amount to raise by
 }
 
-impl<'a> Pot<'a> {
-    pub fn new() -> Pot<'a> {
-        Pot {
+impl<'a> NoLimitPot<'a> {
+    pub fn new() -> NoLimitPot<'a> {
+        NoLimitPot {
             pots: Vec::new(),
             elegible_players: Vec::new(),
             largest_bet_idx: 0,
@@ -20,14 +20,17 @@ impl<'a> Pot<'a> {
             bet_diff: 0,
         }
     }
+}
 
-    pub fn are_all_bets_good(& self, action_idx: usize) -> bool {
-        self.largest_bet_idx == action_idx
+impl Pot for NoLimitPot<'_> {
+
+    fn get_largest_bet_idx(& self) -> usize {
+        self.largest_bet_idx
     }
 
     // This is the function that will work for No Limit
     // TODO: Need to polymorphisize this. Turn struct Pot into a trait that is used in NoLimitPot, LimitPot, and PotLimitPot.
-    pub fn set_highest_bet(&mut self, action_idx: usize, new_bet: u64) -> Result<(), &str> {
+    fn set_highest_bet(&mut self, action_idx: usize, new_bet: u64) -> Result<(), &str> {
         if self.bet_diff + self.largest_bet > new_bet {
             return Err("Bet not high enough");
         }
@@ -36,4 +39,14 @@ impl<'a> Pot<'a> {
         self.largest_bet_idx = action_idx;
         Ok(())
     }
+}
+
+pub trait Pot {
+    fn get_largest_bet_idx(& self) -> usize;
+
+    fn are_all_bets_good(& self, action_idx: usize) -> bool {
+        self.get_largest_bet_idx() == action_idx
+    }
+
+    fn set_highest_bet(&mut self, action_idx: usize, new_bet: u64) -> Result<(), &str>;
 }
