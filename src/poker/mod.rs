@@ -10,5 +10,5 @@ pub use self::player::*;
 pub mod table;
 pub use self::table::*;
 
-pub mod pot;
-pub use self::pot::*;
+pub mod pots;
+pub use self::pots::*;

@@ -4,7 +4,7 @@ use crate::poker::Player;
 use crate::poker::GameVariation;
 use crate::poker::games::DefaultGame;
 
-use crate::poker::{Pot, NoLimitPot};
+use crate::poker::pots::{Pot, NoLimitPot};
 
 pub struct Table {
     players: HashMap<u32, Player>,  // list of all players corresponding to their table position
