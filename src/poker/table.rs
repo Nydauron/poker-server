@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 
+use tokio::sync::{mpsc::UnboundedReceiver, watch::Sender};
+
 use crate::poker::Player;
 use crate::poker::GameVariation;
 use crate::poker::games::DefaultGame;
 
 use crate::poker::pots::{Pot, NoLimitPot};
+
+use crate::poker::Payload;
 
 pub struct Table {
     players: HashMap<u32, Player>,  // list of all players corresponding to their table position
@@ -45,5 +49,12 @@ impl Table {
         self.players.iter().map(|x| {
             x.1.is_away || !x.1.is_in_hand
         }).reduce(|x, y| { x && y }).unwrap()
+    }
+
+    // TODO: Probably should figure out what types are going to be sent thru the channels here
+    pub fn run_loop(&mut self, rx: &mut UnboundedReceiver<Payload>, res_tx: Sender<Payload>) {
+        while let Some(msg) = rx.blocking_recv() {
+            self.check_all_bets_good();
+        }
     }
 }
