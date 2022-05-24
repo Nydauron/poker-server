@@ -35,7 +35,7 @@ impl GameVariation for FiveCardDraw {
         }
 
         players.iter_mut().for_each(|x| {
-            let (cards, muck_reshuffled) = self.deck.deal_cards(5);
+            let (cards, _) = self.deck.deal_cards(5);
             x.1.set_new_hand(cards.unwrap());
         });
 
