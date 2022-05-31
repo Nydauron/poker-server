@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tokio::sync::{mpsc::UnboundedReceiver, watch::Sender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::poker::Player;
 use crate::poker::GameVariation;
@@ -52,7 +52,7 @@ impl Table {
     }
 
     // TODO: Probably should figure out what types are going to be sent thru the channels here
-    pub fn run_loop(&mut self, rx: &mut UnboundedReceiver<Payload>, res_tx: Sender<Payload>) {
+    pub fn run_loop(&mut self, rx: &mut UnboundedReceiver<Payload>, res_tx: UnboundedSender<Payload>) {
         while let Some(msg) = rx.blocking_recv() {
             self.check_all_bets_good();
         }
