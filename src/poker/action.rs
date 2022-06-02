@@ -6,21 +6,19 @@ use actix::{Addr, Recipient};
 
 use tokio::sync::mpsc::{UnboundedSender, UnboundedReceiver};
 
-use crate::websocket::{Response};
+use crate::websocket::{WebsocketResponse};
 
-pub type Payload = i64;
-// This module is in charge of turning incoming messages into Action structs
-// of which will be forwarded to the table game loop
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, Map, json};
 
-pub type GameState = i64;
-
-pub struct ActionResponse(pub String);
+// These types are placeholder types that will be to and from the game
+pub type Payload = i64;   // Sent to the game
+pub type GameState = i64; // Received from the game
 
 #[derive(Debug)]
 pub struct MessageManager{
     pub tx: UnboundedSender<Payload>, // tx to send info to game
-    // pub rx: UnboundedReceiver<Payload>, // rx to receive info from game (channel is instead sent to static listener method)
-    sockets: HashMap<Uuid, Recipient<Response>>
+    sockets: HashMap<Uuid, Recipient<WebsocketResponse>>
 }
 
 impl MessageManager {
@@ -35,7 +33,11 @@ impl MessageManager {
 
     pub fn send_message(&self, message: &str, id_to: &Uuid) {
         if let Some(s) = self.sockets.get(id_to) {
-            let _ = s.do_send(Response(message.to_owned()));
+            let _ = s.do_send(WebsocketResponse{
+                action_type: "TEMP".to_string(),
+                error: None,
+                data: json!(message.to_owned()),
+            });
         }
     }
 
@@ -54,7 +56,7 @@ impl Actor for MessageManager {
 #[rtype(result = "()")]
 pub struct WebsocketConnect {
     pub id: Uuid,
-    pub ws_addr: Recipient<Response>,
+    pub ws_addr: Recipient<WebsocketResponse>,
 }
 
 impl Handler<WebsocketConnect> for MessageManager {
@@ -64,6 +66,22 @@ impl Handler<WebsocketConnect> for MessageManager {
         self.sockets.insert(msg.id, msg.ws_addr);
 
         self.send_message("Hello! and welcome to the poker server!", &msg.id);
+    }
+}
+
+#[derive(Message, Serialize, Deserialize, Debug)]
+#[rtype(result = "()")]
+pub struct ActionRequest {
+    pub id: Uuid,
+    pub action_type: String, // probably should just make this an enum
+    pub data: Map<String, Value>, // Object type
+}
+
+impl Handler<ActionRequest> for MessageManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: ActionRequest, _: &mut Self::Context) {
+
     }
 }
 
@@ -101,6 +119,8 @@ impl Handler<BroadcastState> for MessageManager {
 
     }
 }
+
+pub struct ActionResponse(pub String);
 
 #[derive(Message)]
 #[rtype(result = "()")]

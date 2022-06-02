@@ -1,9 +1,12 @@
 use actix::prelude::*;
 use actix::{Actor, StreamHandler};
 use actix_web_actors::ws;
+use serde::{Serialize, Deserializer};
 use uuid::Uuid;
 
-use crate::poker::{MessageManager, WebsocketConnect, WebsocketDisconnect, SendSingleResponse, ActionResponse};
+use crate::poker::{MessageManager, WebsocketConnect, WebsocketDisconnect, SendSingleResponse, ActionRequest};
+
+use serde_json::{Value, value, json};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -59,8 +62,32 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PlayerSocket {
         match msg {
             Ok(ws::Message::Ping(msg)) => { println!("received ping"); ctx.pong(&msg); },
             Ok(ws::Message::Text(text)) => {
-                println!("received text");
-                self.tx_addr.do_send( SendSingleResponse{sender_uuid: self.id, response: ActionResponse("hello".to_owned())} )
+                println!("Recieved: {}", text.to_string());
+                let res = serde_json::from_str(&text.to_string());
+                match res {
+                    Ok(Value::Object(mut res)) => {
+                        res.insert("id".to_string(), json!(self.id));
+                        let res: ActionRequest = value::from_value(Value::Object(res)).unwrap();
+                        println!("{:#?}", res);
+                        self.tx_addr.do_send(res);
+                    },
+                    Ok(_) => {
+                        let res = WebsocketResponse{
+                            action_type: "unknown".to_string(),
+                            error: Some("Could not get object mutable".to_string()),
+                            data: json!({}),
+                        };
+                        ctx.address().do_send(res);
+                    },
+                    Err(err) => {
+                        let res = WebsocketResponse{
+                            action_type: "unknown".to_string(),
+                            error: Some(err.to_string()),
+                            data: json!({}),
+                        };
+                        ctx.address().do_send(res);
+                    },
+                }
             },
             Ok(ws::Message::Binary(bin)) => { println!("received bytes"); ctx.binary(bin); },
             Ok(ws::Message::Close(reason)) => {
@@ -72,14 +99,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PlayerSocket {
     }
 }
 
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Response(pub String);
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
-impl Handler<Response> for PlayerSocket {
+#[derive(Message, Serialize)]
+#[rtype(result = "()")]
+pub struct WebsocketResponse {
+    pub action_type: String,
+    pub error: Option<String>,
+    pub data: Value,
+}
+
+impl Handler<WebsocketResponse> for PlayerSocket {
     type Result = ();
 
-    fn handle(&mut self, msg: Response, ctx: &mut Self::Context) -> Self::Result {
-        ctx.text(msg.0);
+    fn handle(&mut self, msg: WebsocketResponse, ctx: &mut Self::Context) -> Self::Result {
+        ctx.text(serde_json::to_string(&msg).unwrap());
     }
 }
