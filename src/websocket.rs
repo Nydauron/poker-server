@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::poker::{MessageManager, WebsocketConnect, WebsocketDisconnect, SendSingleResponse, ActionRequest};
 
-use serde_json::{Value, value, json};
+use serde_json::{Value, value, json, error::Error};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -67,21 +67,34 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PlayerSocket {
                 match res {
                     Ok(Value::Object(mut res)) => {
                         res.insert("id".to_string(), json!(self.id));
-                        let res: ActionRequest = value::from_value(Value::Object(res)).unwrap();
-                        println!("{:#?}", res);
-                        self.tx_addr.do_send(res);
+
+                        let action: Result<ActionRequest, Error> = value::from_value(Value::Object(res));
+                        match action {
+                            Ok(action) => {
+                                println!("{:#?}", action);
+                                self.tx_addr.do_send(action);
+                            },
+                            Err(err) => {
+                                let res = WebsocketResponse{
+                                    action_type: "Action parse error".to_string(),
+                                    error: Some(err.to_string()),
+                                    data: json!({}),
+                                };
+                                ctx.address().do_send(res);
+                            }
+                        }
                     },
                     Ok(_) => {
                         let res = WebsocketResponse{
-                            action_type: "unknown".to_string(),
-                            error: Some("Could not get object mutable".to_string()),
+                            action_type: "JSON parse error".to_string(),
+                            error: Some("Root of JSON was not of object type".to_string()),
                             data: json!({}),
                         };
                         ctx.address().do_send(res);
                     },
                     Err(err) => {
                         let res = WebsocketResponse{
-                            action_type: "unknown".to_string(),
+                            action_type: "JSON parse error".to_string(),
                             error: Some(err.to_string()),
                             data: json!({}),
                         };
