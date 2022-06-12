@@ -321,7 +321,6 @@ mod tests {
             largest_bet: 0,
             bet_diff: bb,
 
-            // these settings get reset every hand
             sb_amt: sb,
             bb_amt: bb,
             ante_amt: ante,
@@ -371,7 +370,6 @@ mod tests {
             largest_bet: bb,
             bet_diff: bb,
 
-            // these settings get reset every hand
             sb_amt: sb,
             bb_amt: bb,
             ante_amt: ante,
@@ -421,7 +419,6 @@ mod tests {
             largest_bet: bb,
             bet_diff: bb,
 
-            // these settings get reset every hand
             sb_amt: sb,
             bb_amt: bb,
             ante_amt: ante,
