@@ -12,17 +12,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map, json};
 
 // These types are placeholder types that will be to and from the game
-pub type Payload = i64;   // Sent to the game
-pub type GameState = i64; // Received from the game
+pub type GameActionPayload = ActionRequest;   // Sent to the game
+pub type GameActionResponse = i64;            // Received from the game
+
 
 #[derive(Debug)]
 pub struct MessageManager{
-    pub tx: UnboundedSender<Payload>, // tx to send info to game
+    pub tx: UnboundedSender<GameActionPayload>, // tx to send info to game
     sockets: HashMap<Uuid, Recipient<WebsocketResponse>>
 }
 
 impl MessageManager {
-    pub fn new(tx: UnboundedSender<Payload>) -> Self {
+    pub fn new(tx: UnboundedSender<GameActionPayload>) -> Self {
         let me = Self {
             tx: tx,
             sockets: HashMap::new(),
@@ -41,7 +42,7 @@ impl MessageManager {
         }
     }
 
-    pub async fn listener(addr: Addr<MessageManager>, rx: &mut UnboundedReceiver<Payload>) {
+    pub async fn listener(addr: Addr<MessageManager>, rx: &mut UnboundedReceiver<GameActionResponse>) {
         while let Some(msg) = rx.recv().await {
             // addr.send(BroadcastState{});
         }
@@ -104,6 +105,8 @@ impl Handler<WebsocketDisconnect> for MessageManager {
         }
     }
 }
+
+type GameState = Map<String, Value>;
 
 #[derive(Message)]
 #[rtype(result = "()")]

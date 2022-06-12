@@ -4,10 +4,13 @@ use actix_web_actors::ws;
 use actix::{Actor, Addr};
 use crate::websocket::PlayerSocket;
 use crate::poker::Table;
-use crate::poker::Payload;
+use crate::poker::GameActionPayload;
 use crate::poker::MessageManager;
+use crate::poker::GameActionResponse;
 
 use tokio::sync::mpsc;
+
+use std::sync::{Arc, Mutex};
 
 mod websocket;
 
@@ -40,8 +43,8 @@ async fn main() -> std::io::Result<()> {
 }
 
 fn init() -> ChannelData {
-    let (gl_tx, mut gl_rx) = mpsc::unbounded_channel::<Payload>();
-    let (res_tx, mut res_rx) = mpsc::unbounded_channel::<Payload>();
+    let (gl_tx, mut gl_rx) = mpsc::unbounded_channel::<GameActionPayload>();
+    let (res_tx, mut res_rx) = mpsc::unbounded_channel::<GameActionResponse>();
 
     let msg_man = MessageManager::new(gl_tx);
     let channel_data = msg_man.start();
@@ -54,9 +57,10 @@ fn init() -> ChannelData {
     });
 
     // Game loop
-    tokio::task::spawn_blocking(move || { // gotta benchmark to see if block_in_place provides any speedup
-        let mut table = Table::new();
-        table.run_loop(&mut gl_rx, res_tx);
+    tokio::task::spawn(async move { // gotta benchmark to see if block_in_place provides any speedup
+        // in reality, it makes sense for this thread to be async since we are waiting for I/O
+        let table = Arc::new(Mutex::new(Table::new()));
+        Table::run_loop(table, &mut gl_rx, res_tx).await;
     });
 
     channel_data
