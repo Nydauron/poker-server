@@ -468,7 +468,111 @@ mod tests {
             largest_bet: 0,
             bet_diff: bb,
 
-            // these settings get reset every hand
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
+
+    #[test]
+    fn advanced_post_blinds() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [200, 200, 200, 200];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let bb_idx = 0;
+        assert_eq!(pot.post_before_deal(bb_idx), Ok(()));
+
+        let expected_pot = NoLimitPot {
+            pots: vec![
+                PartialPot {
+                    amount: 0,
+                    elegible_players: HashSet::from([0, 1, 2, 3]),
+                },
+            ],
+            player_stacks_bets: BTreeMap::from([
+                (0, (200, 2)),
+                (1, (200, 0)),
+                (2, (200, 0)),
+                (3, (200, 1)),
+            ]),
+            bet_sizes: BTreeSet::from([1, 2]),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: bb,
+            bet_diff: bb,
+
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
+
+    #[test]
+    fn basic_call_preflop() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [200, 200, 200, 200];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let bb_idx = 2;
+        assert_eq!(pot.post_before_deal(bb_idx), Ok(()));
+
+        assert_eq!(pot.check_call(3), Ok(2));
+        assert_eq!(pot.check_call(0), Ok(2));
+        assert_eq!(pot.check_call(1), Ok(2));
+        assert_eq!(pot.check_call(2), Ok(2));
+
+        pot.collect_bets();
+
+        let expected_pot = NoLimitPot {
+            pots: vec![
+                PartialPot {
+                    amount: 8,
+                    elegible_players: HashSet::from([0, 1, 2, 3]),
+                },
+            ],
+            player_stacks_bets: BTreeMap::from([
+                (0, (198, 0)),
+                (1, (198, 0)),
+                (2, (198, 0)),
+                (3, (198, 0)),
+            ]),
+            bet_sizes: BTreeSet::new(),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: 0,
+            bet_diff: bb,
+
             sb_amt: sb,
             bb_amt: bb,
             ante_amt: ante,
