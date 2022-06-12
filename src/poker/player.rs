@@ -3,7 +3,7 @@ use std::fmt::Error;
 use rs_poker::core::Card;
 
 pub struct Player {
-    table_position: u32,
+    pub table_position: usize,
     pub name: String,
     pub stack: u64,
     pub bet: u64,
@@ -16,7 +16,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(position: u32, name: String, starting_stack: u64) -> Player {
+    pub fn new(position: usize, name: String, starting_stack: u64) -> Player {
         Player {
             table_position: position,
             name: name,
