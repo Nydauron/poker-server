@@ -45,7 +45,7 @@ impl NoLimitPot {
     fn set_bet_no_max(&mut self, pos: &usize, bet: u64) -> Result<(), std::string::String> {
         if let Some(v) = self.player_stacks_bets.get_mut(pos) {
             let bet_size = std::cmp::min(v.0, bet);
-            // println!("v.0 = {}, bet = {}, minimum = {}", v.0, bet, bet_size);
+
             v.1 = bet_size;
             self.bet_sizes.insert(bet_size);
             Ok(())
@@ -92,7 +92,7 @@ impl Pot for NoLimitPot {
         self.is_bomb_pot = is_bomb;
 
         self.bet_diff = bb;
-        self.largest_bet = bb;
+        self.largest_bet = 0;
         self.largest_bet_idx = 0; // idk this needs to be set appropriately
         self.largest_legal_bet_idx = 0;
 
@@ -127,7 +127,7 @@ impl Pot for NoLimitPot {
                 if side_pot.elegible_players.contains(pos) && stack_bet.1 >= bet {
                     stack_bet.0 -= bet;
                     stack_bet.1 -= bet;
-                    side_pot.amount  += bet;
+                    side_pot.amount += bet;
                     elegible_players.insert(*pos);
                     if stack_bet.0 == 0 {
                         all_in_players.insert(*pos);
@@ -151,7 +151,7 @@ impl Pot for NoLimitPot {
         self.bet_sizes.clear();
 
         self.bet_diff = self.bb_amt;
-        self.largest_bet = self.bb_amt;
+        self.largest_bet = 0;
         self.largest_bet_idx = 0; // idk this needs to be set appropriately
         self.largest_legal_bet_idx = 0;
     }
@@ -208,7 +208,6 @@ impl Pot for NoLimitPot {
                     self.bet_diff = bet_size - self.largest_bet;
                     self.largest_legal_bet_idx = pos;
                 }
-                // Question: How much can you raise by once there is a shove for only 100 more? (e.g. 1500 effective, Bet 200, raise to 900, jam for 1000. Can a person 4-bet to 1700?) 
 
                 self.largest_bet = bet_size;
                 self.largest_bet_idx = pos;
@@ -567,4 +566,5 @@ mod tests {
 
         check_flipped(&pot);
     }
+
 }
