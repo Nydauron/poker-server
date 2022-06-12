@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use super::{Pot, PartialPot};
 use crate::poker::{Player};
 
+#[derive(Debug, PartialEq)]
 pub struct NoLimitPot {
     pots: Vec<PartialPot>,
 
@@ -54,6 +55,43 @@ impl NoLimitPot {
         }
     }
 
+    fn post_blind_amt(&mut self, bb_pos: &usize, sb_pos: &usize) -> Result<(), &str> {
+        if !self.player_stacks_bets.contains_key(bb_pos) || !self.player_stacks_bets.contains_key(sb_pos) {
+            return Err("Positions are not valid positions");
+        }
+
+        {
+            let mut bb_stack = self.player_stacks_bets.get_mut(bb_pos).unwrap();
+            let bet_size = std::cmp::min(bb_stack.0, self.bb_amt);
+            bb_stack.1 = bet_size;
+
+            self.bet_sizes.insert(bet_size);
+        }
+
+        {
+            let mut sb_stack = self.player_stacks_bets.get_mut(sb_pos).unwrap();
+            let bet_size = std::cmp::min(sb_stack.0, self.sb_amt);
+            sb_stack.1 = bet_size;
+
+            self.bet_sizes.insert(bet_size);
+        }
+
+        self.largest_bet = self.bb_amt;
+
+        Ok(())
+    }
+
+    fn pay_and_collect_ante(&mut self) {
+        for (_, player_stack) in &mut self.player_stacks_bets {
+            let bet_size = std::cmp::min(player_stack.0, self.ante_amt);
+            player_stack.1 = bet_size;
+
+            self.bet_sizes.insert(bet_size);
+        }
+
+        self.collect_bets();
+    }
+
     fn can_pos_raise(& self, pos: usize) -> bool {
         self.largest_legal_bet_idx < self.largest_bet_idx && (pos > self.largest_bet_idx || pos < self.largest_legal_bet_idx) ||
             self.largest_legal_bet_idx > self.largest_bet_idx && (pos > self.largest_bet_idx && pos < self.largest_legal_bet_idx) ||
@@ -97,8 +135,10 @@ impl Pot for NoLimitPot {
         self.largest_legal_bet_idx = 0;
 
         for (_, p) in players {
-            let entry = (p.stack, 0);
-            self.player_stacks_bets.insert(p.table_position, entry);
+            if !p.is_away {
+                let entry = (p.stack, 0);
+                self.player_stacks_bets.insert(p.table_position, entry);
+            }
         }
 
         Ok(())
@@ -177,17 +217,20 @@ impl Pot for NoLimitPot {
     }
 
     // First method that will be called before the hand begins
-    fn post_before_deal(&mut self, players: &mut HashMap<usize, Player>, bb_idx: usize) -> Result<(), &str> {
+    fn post_before_deal(&mut self, bb_idx: usize) -> Result<(), &str> {
         // pay ante first
-        for (id, player) in players {
-            if !player.is_away {
-                self.set_bet_no_max(id, self.ante_amt);
-            }
-        }
+        self.pay_and_collect_ante();
 
         if !self.is_bomb_pot {
             // dont pay blinds as the ante is the bomb amount
-            todo!();
+            let mut left_pos_arr: BTreeSet<usize> = self.player_stacks_bets.keys().cloned().collect();
+            let right_pos_arr = left_pos_arr.split_off(&bb_idx);
+
+            let mut pos_arr = Vec::from_iter(right_pos_arr.iter());
+            pos_arr.extend(Vec::from_iter(left_pos_arr.iter()));
+            // pos_arr now contains the person in the bb in the first idx and the sb in the last index
+
+            self.post_blind_amt(pos_arr[0], pos_arr[pos_arr.len() - 1]).unwrap();
         }
         Ok(())
     }
@@ -245,6 +288,198 @@ mod tests {
 
     use super::*;
     use crate::poker::Player;
+
+    #[test]
+    fn basic_reset() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [500, 400, 750, 220];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 10;
+        let bb = 20;
+        let ante = 2;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let expected_pot = NoLimitPot {
+            pots: Vec::new(),
+            player_stacks_bets: BTreeMap::from([
+                (0, (500, 0)),
+                (1, (400, 0)),
+                (2, (750, 0)),
+                (3, (220, 0)),
+            ]),
+            bet_sizes: BTreeSet::new(),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: 0,
+            bet_diff: bb,
+
+            // these settings get reset every hand
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
+
+    #[test]
+    fn basic_post_blinds() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [200, 200, 200, 200];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let bb_idx = 2;
+        assert_eq!(pot.post_before_deal(bb_idx), Ok(()));
+
+        let expected_pot = NoLimitPot {
+            pots: vec![
+                PartialPot {
+                    amount: 0,
+                    elegible_players: HashSet::from([0, 1, 2, 3]),
+                },
+            ],
+            player_stacks_bets: BTreeMap::from([
+                (0, (200, 0)),
+                (1, (200, 1)),
+                (2, (200, 2)),
+                (3, (200, 0)),
+            ]),
+            bet_sizes: BTreeSet::from([1, 2]),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: bb,
+            bet_diff: bb,
+
+            // these settings get reset every hand
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
+
+    #[test]
+    fn post_blinds_with_ante() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [2000, 2000, 2000, 2000];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 10;
+        let bb = 20;
+        let ante = 2;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let bb_idx = 2;
+        assert_eq!(pot.post_before_deal(bb_idx), Ok(()));
+
+        let expected_pot = NoLimitPot {
+            pots: vec![
+                PartialPot {
+                    amount: 8,
+                    elegible_players: HashSet::from([0, 1, 2, 3]),
+                },
+            ],
+            player_stacks_bets: BTreeMap::from([
+                (0, (1998, 0)),
+                (1, (1998, 10)),
+                (2, (1998, 20)),
+                (3, (1998, 0)),
+            ]),
+            bet_sizes: BTreeSet::from([10, 20]),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: bb,
+            bet_diff: bb,
+
+            // these settings get reset every hand
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
+
+    #[test]
+    fn post_bomb_pot_ante() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [2000, 2000, 2000, 2000];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 10;
+        let bb = 20;
+        let ante = 100;
+        let is_bomb = true;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let bb_idx = 2;
+        assert_eq!(pot.post_before_deal(bb_idx), Ok(()));
+
+        let expected_pot = NoLimitPot {
+            pots: vec![
+                PartialPot {
+                    amount: 400,
+                    elegible_players: HashSet::from([0, 1, 2, 3]),
+                },
+            ],
+            player_stacks_bets: BTreeMap::from([
+                (0, (1900, 0)),
+                (1, (1900, 0)),
+                (2, (1900, 0)),
+                (3, (1900, 0)),
+            ]),
+            bet_sizes: BTreeSet::new(),
+            largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
+            largest_bet: 0,
+            bet_diff: bb,
+
+            // these settings get reset every hand
+            sb_amt: sb,
+            bb_amt: bb,
+            ante_amt: ante,
+            is_bomb_pot: is_bomb,
+        };
+
+        assert_eq!(expected_pot, pot);
+    }
 
     #[test]
     fn collect_basic_bets() {
