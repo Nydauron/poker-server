@@ -2,6 +2,7 @@ use std::fmt::Error;
 
 use rs_poker::core::Card;
 
+#[derive(Debug)]
 pub struct Player {
     pub table_position: usize,
     pub name: String,
