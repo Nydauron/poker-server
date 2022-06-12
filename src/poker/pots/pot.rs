@@ -22,11 +22,13 @@ pub trait Pot {
 
     fn post_before_deal(&mut self, players: &mut HashMap<usize, Player>, bb_idx: usize) -> Result<(), &str>;
 
-    fn bet_or_shove(&mut self, player_idx: usize, bet: u64) -> Result<u64, &str>;
+    fn bet_or_shove(&mut self, pos: usize, bet: u64) -> Result<u64, std::string::String>;
 
-    fn check_call(&mut self, player_idx: usize) -> Result<u64, &str>;
+    fn check_call(&mut self, pos: usize) -> Result<u64, std::string::String>;
 
     fn reset_pot(&mut self, players: &HashMap<usize, Player>, sb: u64, bb: u64, ante: u64, is_bomb: bool) -> Result<(), &str>;
+    
+    fn collect_bets(&mut self);
 }
 
 #[derive(PartialEq, Debug)]

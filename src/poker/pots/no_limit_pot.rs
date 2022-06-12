@@ -9,8 +9,9 @@ pub struct NoLimitPot {
     player_stacks_bets: BTreeMap<usize, (u64, u64)>, // (stack, current bet)
     bet_sizes: BTreeSet<u64>,
 
-    largest_bet_idx: usize, // should be set when a bet larger than largest_bet is made
-    largest_bet: u64,       // should be set when a bet larger than largest_bet is made
+    largest_bet_idx: usize,       // is set on any bet/all-in
+    largest_legal_bet_idx: usize, // should only be set when a LEGAL bet/raise is made
+    largest_bet: u64,             // should be set when a bet larger than largest_bet is made
 
     bet_diff: u64,          // used to determine the minimum amount to raise by
 
@@ -27,6 +28,7 @@ impl NoLimitPot {
             player_stacks_bets: BTreeMap::new(),
             bet_sizes: BTreeSet::new(),
             largest_bet_idx: 0,
+            largest_legal_bet_idx: 0,
             largest_bet: 0,
             bet_diff: 0,
 
@@ -52,56 +54,11 @@ impl NoLimitPot {
         }
     }
 
-    // TODO: TEST
-    fn collect_bets(&mut self) {
-        let mut iter = self.bet_sizes.iter();
-        let mut prev_bet_collected = 0;
-        // println!("{:?}", self.bet_sizes);
-
-        while let Some(&b) = iter.next() {
-            let bet = b - prev_bet_collected;
-            let mut side_pot = self.pots.pop()
-                .unwrap_or_else(|| {
-                    let p: Vec<usize> = self.player_stacks_bets.keys().cloned().collect();
-                    PartialPot {
-                        amount: 0,
-                        elegible_players: HashSet::from_iter(p), // if i do checks on elegible players, this will need to be initially populated
-                    }
-                }
-            );
-            let mut elegible_players = HashSet::<usize>::new();
-            let mut all_in_players = HashSet::<usize>::new();
-            // println!("{:?}", self.player_stacks_bets);
-            for (pos, stack_bet) in &mut self.player_stacks_bets {
-                // could check if bettor is an elegible player
-                if side_pot.elegible_players.contains(pos) && stack_bet.1 >= bet {
-                    stack_bet.0 -= bet;
-                    stack_bet.1 -= bet;
-                    side_pot.amount  += bet;
-                    elegible_players.insert(*pos);
-                    if stack_bet.0 == 0 {
-                        all_in_players.insert(*pos);
-                    }
-                }
-            }
-
-            side_pot.elegible_players = elegible_players.clone();
-
-            self.pots.push(side_pot);
-            prev_bet_collected = b;
-
-            // Issue: We need to push an empty side pot in the case where a person in the current side pot goes all-in. We need a way to detect that
-            if !all_in_players.is_empty() {
-                self.pots.push(PartialPot {
-                    amount: 0,
-                    elegible_players: &elegible_players - &all_in_players, // TODO: Fix should be eligible_players from prev side pot minus the all-in players
-                });
-            }
-        }
-
-        self.bet_sizes.clear();
+    fn can_pos_raise(& self, pos: usize) -> bool {
+        self.largest_legal_bet_idx < self.largest_bet_idx && (pos > self.largest_bet_idx || pos < self.largest_legal_bet_idx) ||
+            self.largest_legal_bet_idx > self.largest_bet_idx && (pos > self.largest_bet_idx && pos < self.largest_legal_bet_idx) ||
+            self.largest_legal_bet_idx == self.largest_bet_idx && self.largest_bet_idx != pos
     }
-
 }
 
 impl Pot for NoLimitPot {
@@ -134,12 +91,69 @@ impl Pot for NoLimitPot {
         self.ante_amt = ante;
         self.is_bomb_pot = is_bomb;
 
+        self.bet_diff = bb;
+        self.largest_bet = bb;
+        self.largest_bet_idx = 0; // idk this needs to be set appropriately
+        self.largest_legal_bet_idx = 0;
+
         for (_, p) in players {
             let entry = (p.stack, 0);
             self.player_stacks_bets.insert(p.table_position, entry);
         }
 
         Ok(())
+    }
+
+    fn collect_bets(&mut self) {
+        let mut iter = self.bet_sizes.iter();
+        let mut prev_bet_collected = 0;
+
+        while let Some(&b) = iter.next() {
+            let bet = b - prev_bet_collected;
+            let mut side_pot = self.pots.pop()
+                .unwrap_or_else(|| {
+                    let p: Vec<usize> = self.player_stacks_bets.keys().cloned().collect();
+                    PartialPot {
+                        amount: 0,
+                        elegible_players: HashSet::from_iter(p),
+                    }
+                }
+            );
+
+            let mut elegible_players = HashSet::<usize>::new();
+            let mut all_in_players = HashSet::<usize>::new();
+            for (pos, stack_bet) in &mut self.player_stacks_bets {
+                // could check if bettor is an elegible player
+                if side_pot.elegible_players.contains(pos) && stack_bet.1 >= bet {
+                    stack_bet.0 -= bet;
+                    stack_bet.1 -= bet;
+                    side_pot.amount  += bet;
+                    elegible_players.insert(*pos);
+                    if stack_bet.0 == 0 {
+                        all_in_players.insert(*pos);
+                    }
+                }
+            }
+
+            side_pot.elegible_players = elegible_players.clone();
+
+            self.pots.push(side_pot);
+            prev_bet_collected = b;
+
+            if !all_in_players.is_empty() {
+                self.pots.push(PartialPot {
+                    amount: 0,
+                    elegible_players: &elegible_players - &all_in_players,
+                });
+            }
+        }
+
+        self.bet_sizes.clear();
+
+        self.bet_diff = self.bb_amt;
+        self.largest_bet = self.bb_amt;
+        self.largest_bet_idx = 0; // idk this needs to be set appropriately
+        self.largest_legal_bet_idx = 0;
     }
 
     fn get_largest_bet_idx(& self) -> usize {
@@ -171,23 +185,65 @@ impl Pot for NoLimitPot {
             }
         }
 
-        if self.is_bomb_pot {
+        if !self.is_bomb_pot {
+            // dont pay blinds as the ante is the bomb amount
             todo!();
         }
         Ok(())
     }
 
-    fn bet_or_shove(&mut self, player_idx: usize, bet: u64) -> Result<u64, &str> {
-        todo!();
+    // Function to indicate player in position pos is betting/raising/shoving an amount of bet
+    fn bet_or_shove(&mut self, pos: usize, bet: u64) -> Result<u64, std::string::String> {
+        if !self.can_pos_raise(pos) {
+            // This case is very much the edge case
+            Err(format!("You already called the latest legal bet, so you are no longer allowed to raise"))
+        } else if let Some(v) = self.player_stacks_bets.get_mut(&pos) {
+            let min_bet = self.largest_bet + self.bet_diff;
+            if v.0 <= bet || bet >= min_bet {
+                let bet_size = std::cmp::min(v.0, bet);
+                v.1 = bet_size;
+                self.bet_sizes.insert(bet_size);
+
+                if bet >= min_bet {
+                    self.bet_diff = bet_size - self.largest_bet;
+                    self.largest_legal_bet_idx = pos;
+                }
+                // Question: How much can you raise by once there is a shove for only 100 more? (e.g. 1500 effective, Bet 200, raise to 900, jam for 1000. Can a person 4-bet to 1700?) 
+
+                self.largest_bet = bet_size;
+                self.largest_bet_idx = pos;
+
+                Ok(bet_size)
+            } else {
+                if v.0 <= min_bet {
+                    Err(format!("Bet of {} is too small (must shove)", bet))
+                } else {
+                    Err(format!("Bet of {} is too small (must be at least {})", bet, min_bet))
+                }
+            }
+        } else {
+            Err(format!("Could not find player stack in position {}", pos))
+        }
     }
 
-    fn check_call(&mut self, player_idx: usize) -> Result<u64, &str> {
-        todo!();
+    // Function to indicate player in position pos is calling the largest bet
+    fn check_call(&mut self, pos: usize) -> Result<u64, std::string::String> {
+        if let Some(v) = self.player_stacks_bets.get_mut(&pos) {
+            let bet_size = std::cmp::min(v.0, self.largest_bet);
+            v.1 = bet_size;
+            self.bet_sizes.insert(bet_size); // still need to attempt an insert as we could be shoving
+
+            Ok(bet_size)
+        } else {
+            Err(format!("Could not find player stack in position {}", pos))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::Rng;
+
     use super::*;
     use crate::poker::Player;
 
@@ -432,4 +488,83 @@ mod tests {
         assert_eq!(expected_player_stack_bets, pot.player_stacks_bets);
     }
 
+    fn check_normal(pot: &NoLimitPot) {
+        for i in 0..pot.largest_bet_idx+1 {
+            assert!(!pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+
+        for i in pot.largest_bet_idx+1..pot.largest_legal_bet_idx {
+            assert!(pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+
+        for i in pot.largest_legal_bet_idx..10 {
+            assert!(!pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+    }
+
+    fn check_flipped(pot: &NoLimitPot) {
+        for i in 0..pot.largest_legal_bet_idx {
+            assert!(pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+
+        for i in pot.largest_legal_bet_idx..pot.largest_bet_idx+1 {
+            assert!(!pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+
+        for i in pot.largest_bet_idx+1..10 {
+            assert!(pot.can_pos_raise(i), "Position {} was incorrect", i);
+        }
+    }
+
+    #[test]
+    fn can_raise_action() {
+        let mut pot = NoLimitPot::new();
+
+        pot.largest_bet_idx = 3;
+        pot.largest_legal_bet_idx = 9;
+
+        check_normal(&pot);
+    }
+
+    #[test]
+    fn can_raise_action_flipped() {
+        let mut pot = NoLimitPot::new();
+
+        pot.largest_bet_idx = 8;
+        pot.largest_legal_bet_idx = 2;
+
+        check_flipped(&pot);
+    }
+
+    #[test]
+    fn can_raise_action_close() {
+        let mut pot = NoLimitPot::new();
+
+        pot.largest_bet_idx = 5;
+        pot.largest_legal_bet_idx = 6;
+
+        check_normal(&pot);
+    }
+
+    #[test]
+    fn can_raise_action_flipped_close() {
+        let mut pot = NoLimitPot::new();
+
+        pot.largest_bet_idx = 3;
+        pot.largest_legal_bet_idx = 2;
+
+        check_flipped(&pot);
+    }
+
+    #[test]
+    fn can_raise_action_same_idx() {
+        let mut pot = NoLimitPot::new();
+
+        let mut rng = rand::thread_rng();
+        let rand_idx: usize = rng.gen_range(0..=9);
+        pot.largest_bet_idx = rand_idx;
+        pot.largest_legal_bet_idx = rand_idx;
+
+        check_flipped(&pot);
+    }
 }
