@@ -112,10 +112,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PlayerSocket {
     }
 }
 
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
-
 #[derive(Message, Serialize)]
 #[rtype(result = "()")]
 pub struct WebsocketResponse {
