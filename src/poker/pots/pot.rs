@@ -16,8 +16,6 @@ pub trait Pot {
         }
     }
 
-    // fn set_highest_bet(&mut self, action_idx: &usize, player_stack: u64, new_bet: u64) -> Result<(), &str>;
-
     fn is_bomb_pot(& self) -> bool;
 
     fn post_before_deal(&mut self, bb_idx: &usize) -> Result<(), &str>;

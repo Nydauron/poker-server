@@ -10,9 +10,8 @@ pub struct NoLimitPot {
     player_stacks_bets: BTreeMap<usize, (u64, u64)>, // (stack, current bet)
     bet_sizes: BTreeSet<u64>,
 
-    largest_bet_idxes: Option<(usize, usize)>, // (LB, LLB)
-    // largest_legal_bet_idx: usize, // should only be set when a LEGAL bet/raise is made
-    largest_bet: u64,             // should be set when a bet larger than largest_bet is made
+    largest_bet_idxes: Option<(usize, usize)>,  // (LB, LLB)
+    largest_bet: u64,                           // should be set when a bet larger than largest_bet is made
 
     bet_diff: u64,          // used to determine the minimum amount to raise by
 
@@ -203,19 +202,6 @@ impl Pot for NoLimitPot {
         self.largest_bet_idxes
     }
 
-    // This is the function that will work for No Limit
-    // TODO: Need to polymorphisize this. Turn struct Pot into a trait that is used in NoLimitPot, LimitPot, and PotLimitPot.
-    // This method seems rather redundant and deprecated since it has no checks to see if the bet was a legal bet/raise
-    // fn set_highest_bet(&mut self, action_idx: &usize, player_stack: u64, new_bet: u64) -> Result<(), &str> {
-    //     if new_bet != player_stack && self.bet_diff + self.largest_bet > new_bet {
-    //         return Err("Bet not high enough");
-    //     }
-    //     self.bet_diff = new_bet - self.largest_bet;
-    //     self.largest_bet = new_bet;
-    //     self.largest_bet_idxes = Some((action_idx, action_idx));
-    //     Ok(())
-    // }
-
     fn is_bomb_pot(& self) -> bool {
         self.is_bomb_pot
     }
@@ -302,7 +288,7 @@ impl Pot for NoLimitPot {
         Ok(())
     }
 
-    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: HashMap<usize, u64>) {
+    fn distribute_pot(&mut self, _players: &mut HashMap<usize, Player>, _hand_rankings: HashMap<usize, u64>) {
         todo!();
     }
 
