@@ -30,7 +30,7 @@ pub trait Pot {
     
     fn collect_bets(&mut self);
 
-    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: HashMap<usize, u64>);
+    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: &HashMap<usize, u64>, btn_idx: &usize) -> HashMap<usize, u64>;
 
 }
 

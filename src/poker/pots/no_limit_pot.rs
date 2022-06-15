@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ops::Bound::{Excluded, Included, Unbounded};
 
 use super::{Pot, PartialPot};
 use crate::poker::{Player};
@@ -141,6 +142,8 @@ impl Pot for NoLimitPot {
                 self.player_stacks_bets.insert(p.table_position, entry);
             }
         }
+
+        self.bet_sizes.clear();
 
         Ok(())
     }
@@ -288,8 +291,65 @@ impl Pot for NoLimitPot {
         Ok(())
     }
 
-    fn distribute_pot(&mut self, _players: &mut HashMap<usize, Player>, _hand_rankings: HashMap<usize, u64>) {
-        todo!();
+    // Returns back a map of who won and how much they won
+    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: &HashMap<usize, u64>, btn_idx: &usize) -> HashMap<usize, u64> {
+        let mut total_winnings: HashMap<usize, u64> = HashMap::new();
+        for sidepot in &self.pots {
+            if sidepot.amount == 0 {
+                continue;
+            }
+
+            let mut sidepot_winners: BTreeSet<usize> = BTreeSet::new();
+            let mut highest_rank_hand: u64 = 0;
+            for pos in &sidepot.elegible_players {
+                if let Some(rank) = hand_rankings.get(pos) {
+                    if *rank > highest_rank_hand {
+                        highest_rank_hand = *rank;
+                        sidepot_winners.clear();
+                        sidepot_winners.insert(*pos);
+                    } else if *rank == highest_rank_hand {
+                        sidepot_winners.insert(*pos);
+                    }
+                }
+            }
+
+            // Should never be 0, but this is a safety check
+            if sidepot_winners.len() > 0 {
+                // distribute sidepot to winners
+                let mut pot_amt = sidepot.amount;
+                let winner_count = sidepot_winners.len() as u64;
+                let pot_per_winner = pot_amt / winner_count;
+
+                // most OOP to IP
+                let mut distribution = vec![pot_per_winner; winner_count as usize];
+
+                pot_amt -= pot_per_winner * winner_count;
+
+                // Give one chip per person until we run out, bc pot_amt is just less than sidepot_winners.len()
+                for d in distribution.iter_mut() {
+                    if pot_amt == 0 {
+                        break;
+                    }
+                    *d += 1;
+                    pot_amt -= 1;
+                }
+
+                let left_of_btn = sidepot_winners.range((Excluded(btn_idx), Unbounded));
+                let right_of_btn = sidepot_winners.range((Unbounded, Included(btn_idx)));
+
+                let sb_to_btn = left_of_btn.chain(right_of_btn);
+                for (pos, winnings) in sb_to_btn.zip(distribution) {
+                    if let Some(player) = players.get_mut(pos) {
+                        player.stack += winnings;
+                        let mut total = *total_winnings.get(pos).unwrap_or(&0);
+                        total += winnings;
+                        total_winnings.insert(*pos, total);
+                    }
+                }
+            }
+        }
+
+        total_winnings
     }
 
 }
@@ -1303,6 +1363,310 @@ mod tests {
         pot.largest_bet_idxes = Some((rand_idx, rand_idx));
 
         check_flipped(&pot);
+    }
+
+    #[test]
+    fn basic_distribute_pot() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [50, 150, 400, 75];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 262,
+                elegible_players: HashSet::from([0, 3]),
+            },
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 1700),
+            (1, 300),
+            (2, 40),
+            (3, 2000),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (3, 262),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![50, 150, 400, 337];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
+    }
+
+    #[test]
+    fn split_distribute_pot() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [50, 150, 400, 75];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 262,
+                elegible_players: HashSet::from([0, 3]),
+            },
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 2000),
+            (1, 300),
+            (2, 40),
+            (3, 2000),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (0, 131),
+            (3, 131),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![181, 150, 400, 206];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
+    }
+
+    #[test]
+    fn split_distribute_pot_odd_chip() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [50, 150, 400, 75];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 263,
+                elegible_players: HashSet::from([0, 3]),
+            },
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 2000),
+            (1, 300),
+            (2, 40),
+            (3, 2000),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (0, 131),
+            (3, 132),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![181, 150, 400, 207];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
+    }
+
+    #[test]
+    fn split_distribute_pot_odd_chip_3_players() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [50, 150, 400, 75];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 263,
+                elegible_players: HashSet::from([0, 1, 3]),
+            },
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 2000),
+            (1, 2000),
+            (2, 40),
+            (3, 2000),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (0, 87),
+            (1, 88),
+            (3, 88),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![137, 238, 400, 163];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
+    }
+
+    #[test]
+    fn distribute_multiple_pots() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [0, 100, 400, 25];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 412,
+                elegible_players: HashSet::from([0, 1, 3]),
+            },
+            PartialPot {
+                amount: 50,
+                elegible_players: HashSet::from([1, 3]),
+            },
+            PartialPot {
+                amount: 0,
+                elegible_players: HashSet::from([1]),
+            }
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 2000),
+            (1, 300),
+            (2, 40),
+            (3, 1700),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (0, 412),
+            (3, 50),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![412, 100, 400, 75];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
+    }
+
+    #[test]
+    fn distribute_multiple_pots_split_main() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [0, 100, 400, 25];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let btn_idx = 0;
+
+        let pots = vec![
+            PartialPot {
+                amount: 412,
+                elegible_players: HashSet::from([0, 1, 3]),
+            },
+            PartialPot {
+                amount: 50,
+                elegible_players: HashSet::from([1, 3]),
+            },
+            PartialPot {
+                amount: 0,
+                elegible_players: HashSet::from([1]),
+            }
+        ];
+        pot.pots.extend(pots);
+
+        let rankings: HashMap<usize, u64> = HashMap::from([
+            (0, 2000),
+            (1, 300),
+            (2, 40),
+            (3, 2000),
+        ]);
+
+        let expected_output: HashMap<usize, u64> = HashMap::from([
+            (0, 206),
+            (3, 256),
+        ]);
+        assert_eq!(expected_output, pot.distribute_pot(&mut players, &rankings, &btn_idx));
+
+        let expected_stacks = vec![206, 100, 400, 281];
+
+        for (pos, player) in &players {
+            assert_eq!(expected_stacks[*pos], player.stack);
+        }
     }
 
 }
