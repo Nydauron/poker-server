@@ -18,6 +18,8 @@ pub trait Pot {
 
     fn is_bomb_pot(& self) -> bool;
 
+    fn is_pot_contested(& self) -> bool;
+
     fn post_before_deal(&mut self, bb_idx: &usize) -> Result<(), &str>;
 
     fn bet_or_shove(&mut self, pos: &usize, bet: u64) -> Result<u64, std::string::String>;

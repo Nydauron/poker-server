@@ -113,6 +113,16 @@ impl Pot for NoLimitPot {
             .ok_or(format!("Player position {} did not play in the current hand", pos))
     }
 
+    // should be used to check if there is only one person contesting the pot
+    fn is_pot_contested(& self) -> bool {
+        self.pots.last().map_or_else(|| {
+            true
+        },
+        |sidepot| {
+            sidepot.elegible_players.len() > 1
+        })
+    }
+
     // Resets the pot to all inital values (similar to new(), but doesnt create a new Pot instance)
     fn reset_pot(&mut self, players: &HashMap<usize, Player>, sb: u64, bb: u64, ante: u64, is_bomb: bool) -> Result<(), &str> {
         if is_bomb && ante == 0 {
@@ -1667,6 +1677,72 @@ mod tests {
         for (pos, player) in &players {
             assert_eq!(expected_stacks[*pos], player.stack);
         }
+    }
+
+    #[test]
+    fn check_contested_pot() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [50, 150, 400, 75];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let pots = vec![
+            PartialPot {
+                amount: 262,
+                elegible_players: HashSet::from([0, 3]),
+            },
+        ];
+        pot.pots.extend(pots);
+
+        assert_eq!(true, pot.is_pot_contested());
+    }
+
+    #[test]
+    fn check_uncontested_pot() {
+        let mut players = HashMap::<usize, Player>::new();
+        let mut pot = NoLimitPot::new();
+
+        let starting_stacks = [0, 100, 400, 25];
+
+        for id in 0..4 {
+            players.insert(id, Player::new(id, format!("Player {}", id), starting_stacks[id]));
+        }
+
+        let sb = 1;
+        let bb = 2;
+        let ante = 0;
+        let is_bomb = false;
+
+        assert_eq!(pot.reset_pot(&players, sb, bb, ante, is_bomb), Ok(()));
+
+        let pots = vec![
+            PartialPot {
+                amount: 412,
+                elegible_players: HashSet::from([0, 1, 3]),
+            },
+            PartialPot {
+                amount: 50,
+                elegible_players: HashSet::from([1, 3]),
+            },
+            PartialPot {
+                amount: 0,
+                elegible_players: HashSet::from([1]),
+            }
+        ];
+        pot.pots.extend(pots);
+
+        assert_eq!(false, pot.is_pot_contested());
     }
 
 }
