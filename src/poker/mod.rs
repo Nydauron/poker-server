@@ -1,6 +1,3 @@
-pub mod pokerdeck;
-pub use self::pokerdeck::*;
-
 pub mod games;
 pub use self::games::*;
 
@@ -15,3 +12,6 @@ pub use self::pots::*;
 
 mod action;
 pub use self::action::*;
+
+pub mod game_actions;
+pub use self::game_actions::*;

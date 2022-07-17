@@ -10,11 +10,24 @@ use crate::websocket::{WebsocketResponse};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map, json};
+use serde_repr::{Deserialize_repr};
 
 // These types are placeholder types that will be to and from the game
 pub type GameActionPayload = ActionRequest;   // Sent to the game
 pub type GameActionResponse = i64;            // Received from the game
 
+#[derive(Deserialize_repr, Debug)]
+#[repr(u8)]
+pub enum ActionType {
+     CheckCall = 0,
+     BetRaise = 1,
+     Fold = 2,
+     Draw = 3,
+     StartGame = 4,
+     StopGame = 6,
+     PauseGame = 7,
+     ResumeGame = 8,
+}
 
 #[derive(Debug)]
 pub struct MessageManager{
@@ -70,11 +83,11 @@ impl Handler<WebsocketConnect> for MessageManager {
     }
 }
 
-#[derive(Message, Serialize, Deserialize, Debug)]
+#[derive(Message, Deserialize, Debug)]
 #[rtype(result = "()")]
 pub struct ActionRequest {
     pub id: Uuid,
-    pub action_type: String, // probably should just make this an enum
+    pub action_type: ActionType,
     pub data: Map<String, Value>, // Object type
 }
 
