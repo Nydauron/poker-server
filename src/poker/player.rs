@@ -1,6 +1,6 @@
 use std::fmt::Error;
 
-use rs_poker::core::Card;
+use playing_cards::core::Card;
 
 #[derive(Debug)]
 pub struct Player {

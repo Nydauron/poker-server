@@ -8,6 +8,8 @@ use crate::poker::GameActionPayload;
 use crate::poker::MessageManager;
 use crate::poker::GameActionResponse;
 
+use playing_cards::poker::init_lookup_table;
+
 use tokio::sync::mpsc;
 
 use std::sync::{Arc, Mutex};
@@ -43,6 +45,8 @@ async fn main() -> std::io::Result<()> {
 }
 
 fn init() -> ChannelData {
+    init_lookup_table();
+
     let (gl_tx, mut gl_rx) = mpsc::unbounded_channel::<GameActionPayload>();
     let (res_tx, mut res_rx) = mpsc::unbounded_channel::<GameActionResponse>();
 
