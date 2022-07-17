@@ -36,10 +36,14 @@ async fn handle_websocket(data: web::Data<ChannelData>, req: HttpRequest, stream
 async fn main() -> std::io::Result<()> {
     let data = init();
 
+    let ip = "0.0.0.0";
+    let port  = 8000;
+    println!("Actix server running on {}:{}", ip, port);
+
     HttpServer::new(move || App::new()
         .app_data(web::Data::new(data.clone()))
         .service(handle_websocket))
-        .bind(("0.0.0.0", 8000))?
+        .bind((ip, port))?
         .run()
         .await
 }
