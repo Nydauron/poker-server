@@ -1,5 +1,9 @@
 use std::collections::{HashSet, HashMap, BTreeMap};
+use playing_cards::poker::Rank;
+
 use crate::poker::Player;
+
+use super::OddChipPriority;
 
 pub trait Pot {
     fn get_all_player_stacks_bets(& self) -> &BTreeMap<usize, (u64, u64)>;
@@ -32,7 +36,7 @@ pub trait Pot {
     
     fn collect_bets(&mut self);
 
-    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: &HashMap<usize, u64>, btn_idx: &usize) -> HashMap<usize, u64>;
+    fn distribute_pot(&mut self, players: &mut HashMap<usize, Player>, hand_rankings: &Vec<HashMap<usize, Rank>>, btn_idx: &usize, odd_chip: OddChipPriority) -> Result<HashMap<usize, u64>, &str>;
 
 }
 

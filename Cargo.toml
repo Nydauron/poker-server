@@ -9,9 +9,8 @@ edition = "2021"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 jsonwebtoken = "8.1.0"
 actix = "0.13.0"
-actix-web = "4.0.1"
+actix-web = "4.1.0"
 actix-web-actors = "4.1.0"
-rs_poker = "2.0.0-alpha.1"
 sfmt = "0.7.0"
 x25519-dalek = "1.2.0"
 getrandom = { version = "0.2.6", features = ["std"] }
@@ -23,3 +22,4 @@ uuid = { version = "1.1.0", features = ["v4", "serde"] }
 serde = "1.0.137"
 serde_derive = "1.0.137"
 serde_json = { version = "1.0.81", features = ["alloc"] }
+playing-cards = { git = "https://github.com/Nydauron/playing-cards", branch = "poker-rank-types", features = ["poker"] }
