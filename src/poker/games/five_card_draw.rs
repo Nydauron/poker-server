@@ -1,15 +1,17 @@
 use std::collections::HashMap;
 
+use playing_cards::core::{Card, CardDeck};
+use playing_cards::poker::{HighEvaluator, Rank};
+
 use crate::poker::games::GameVariation;
-use crate::poker::games::evaluator_results::EvaluatorResults;
-use crate::poker::CardDeck;
 use crate::poker::Player;
 
-use rs_poker::core::Rank;
 
 pub struct FiveCardDraw {
     deck: CardDeck,
-    eval: FiveCardDrawEvaluator,
+    eval: HighEvaluator,
+
+    board: Vec<Card>,
 }
 
 impl FiveCardDraw {
@@ -19,7 +21,9 @@ impl FiveCardDraw {
     pub fn new() -> FiveCardDraw {
         FiveCardDraw {
             deck: CardDeck::new().unwrap(),
-            eval: FiveCardDrawEvaluator {  }
+            eval: HighEvaluator{},
+
+            board: Vec::new(),
         }
     }
 
@@ -44,19 +48,7 @@ impl GameVariation for FiveCardDraw {
 
     fn evaluate_all_hands(& self) -> Vec<Vec<(&Player, Rank)>> {
         // calls evaluator
-        // TODO: Implement
-        Vec::new()
+        todo!()
     }
 
-}
-
-pub struct FiveCardDrawEvaluator {
-
-}
-
-impl EvaluatorResults for FiveCardDrawEvaluator {
-    fn get_list_of_rankings(& self) -> Vec<Vec<(&Player, Rank)>> {
-        // TODO: Implement with either rs_poker or yr own
-        Vec::new()
-    }
 }

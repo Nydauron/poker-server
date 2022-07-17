@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+use playing_cards::core::Card;
+
 use super::super::player::Player;
-use rs_poker::core::Rank;
+use playing_cards::poker::Rank;
 
 pub trait GameVariation {
 

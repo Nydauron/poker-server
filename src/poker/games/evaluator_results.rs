@@ -1,5 +1,5 @@
 use crate::poker::Player;
-use rs_poker::core::Rank;
+use playing_cards::poker::Rank;
 
 pub trait EvaluatorResults {
 
